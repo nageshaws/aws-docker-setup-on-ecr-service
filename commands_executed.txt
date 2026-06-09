@@ -1,0 +1,14 @@
+aws ecr create-repository --repository-name flask-app --region us-east-1
+
+
+395671100148.dkr.ecr.us-east-1.amazonaws.com/flask-app
+
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 395671100148.dkr.ecr.us-east-1.amazonaws.com
+
+docker tag flask-app:v1 395671100148.dkr.ecr.us-east-1.amazonaws.com/flask-app:v1
+docker push 395671100148.dkr.ecr.us-east-1.amazonaws.com/flask-app:v1
+
+
+docker portainer:
+
+docker run -d --name portainer -p 9000:9000 -p 9443:9443 -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce

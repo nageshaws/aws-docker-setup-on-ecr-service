@@ -1,0 +1,28 @@
+aws-docker-compose-fullstack-deployment/
+│
+├── README.md
+├── docker-compose.yml
+├── .gitignore
+│
+├── frontend/
+│   ├── Dockerfile
+│   └── source-code
+│
+├── backend/
+│   ├── Dockerfile
+│   └── source-code
+│
+├── traefik/
+│   ├── traefik.yml
+│   └── dynamic.yml
+│
+├── docs/
+│   ├── architecture.png
+│   ├── portainer-dashboard.png
+│   ├── ecr-push.png
+│   └── deployment-steps.md
+│
+└── screenshots/
+    ├── docker-ps.png
+    ├── portainer.png
+    └── traefik-ssl.png

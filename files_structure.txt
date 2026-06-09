@@ -1,0 +1,364 @@
+# Sample Applications for Docker Deployment
+
+## Project Structure
+
+```text
+aws-docker-compose-fullstack-deployment/
+│
+├── frontend-static/
+│   ├── index.html
+│   └── Dockerfile
+│
+├── backend-nodejs/
+│   ├── app.js
+│   ├── package.json
+│   └── Dockerfile
+│
+├── backend-python/
+│   ├── app.py
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── traefik/
+│   ├── traefik.yml
+│   ├── dynamic.yml
+│   └── acme.json
+│
+└── docker-compose.yml
+```
+
+---
+
+# 1. Static HTML Application
+
+## index.html
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Docker AWS Demo</title>
+</head>
+<body>
+    <h1>Welcome to Docker on AWS EC2</h1>
+
+    <p>Frontend served through Nginx Container.</p>
+
+    <h2>Technology Stack</h2>
+
+    <ul>
+        <li>Docker</li>
+        <li>Docker Compose</li>
+        <li>AWS EC2</li>
+        <li>Traefik SSL</li>
+        <li>Portainer</li>
+    </ul>
+</body>
+</html>
+```
+
+## Dockerfile
+
+```dockerfile
+FROM nginx:latest
+
+COPY index.html /usr/share/nginx/html/index.html
+
+EXPOSE 80
+```
+
+Build:
+
+```bash
+docker build -t frontend-static:v1 .
+```
+
+Run:
+
+```bash
+docker run -d -p 80:80 frontend-static:v1
+```
+
+---
+
+# 2. Node.js API Application
+
+## app.js
+
+```javascript
+const express = require("express");
+
+const app = express();
+
+app.get("/", (req, res) => {
+    res.json({
+        application: "Node.js API",
+        status: "Running",
+        environment: "Docker"
+    });
+});
+
+app.get("/health", (req, res) => {
+    res.json({
+        status: "UP"
+    });
+});
+
+app.listen(3000, "0.0.0.0", () => {
+    console.log("Server running on port 3000");
+});
+```
+
+## package.json
+
+```json
+{
+  "name": "node-api",
+  "version": "1.0.0",
+  "main": "app.js",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
+```
+
+## Dockerfile
+
+```dockerfile
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["node", "app.js"]
+```
+
+Build:
+
+```bash
+docker build -t node-api:v1 .
+```
+
+Run:
+
+```bash
+docker run -d -p 3000:3000 node-api:v1
+```
+
+Test:
+
+```bash
+curl http://localhost:3000
+```
+
+---
+
+# 3. Python Flask API
+
+## app.py
+
+```python
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return jsonify({
+        "application": "Python Flask API",
+        "status": "Running",
+        "environment": "Docker"
+    })
+
+@app.route("/health")
+def health():
+    return jsonify({
+        "status": "UP"
+    })
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
+```
+
+## requirements.txt
+
+```text
+flask
+gunicorn
+```
+
+## Dockerfile
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 5000
+
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+```
+
+Build:
+
+```bash
+docker build -t python-api:v1 .
+```
+
+Run:
+
+```bash
+docker run -d -p 5000:5000 python-api:v1
+```
+
+Test:
+
+```bash
+curl http://localhost:5000
+```
+
+---
+
+# Docker Compose Configuration
+
+## docker-compose.yml
+
+```yaml
+services:
+
+  frontend:
+    build:
+      context: ./frontend-static
+    container_name: frontend
+
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=Host(`app.example.com`)
+      - traefik.http.routers.frontend.entrypoints=websecure
+      - traefik.http.routers.frontend.tls.certresolver=letsencrypt
+      - traefik.http.services.frontend.loadbalancer.server.port=80
+
+  node-api:
+    build:
+      context: ./backend-nodejs
+    container_name: node-api
+
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.node.rule=Host(`node.example.com`)
+      - traefik.http.routers.node.entrypoints=websecure
+      - traefik.http.routers.node.tls.certresolver=letsencrypt
+      - traefik.http.services.node.loadbalancer.server.port=3000
+
+  python-api:
+    build:
+      context: ./backend-python
+    container_name: python-api
+
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.python.rule=Host(`python.example.com`)
+      - traefik.http.routers.python.entrypoints=websecure
+      - traefik.http.routers.python.tls.certresolver=letsencrypt
+      - traefik.http.services.python.loadbalancer.server.port=5000
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+
+    volumes:
+      - mongodb_data:/data/db
+
+  traefik:
+    image: traefik:v3
+    container_name: traefik
+
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.email=admin@example.com
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/acme.json:/letsencrypt/acme.json
+
+  portainer:
+    image: portainer/portainer-ce
+
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.portainer.rule=Host(`portainer.example.com`)
+      - traefik.http.routers.portainer.entrypoints=websecure
+      - traefik.http.routers.portainer.tls.certresolver=letsencrypt
+      - traefik.http.services.portainer.loadbalancer.server.port=9000
+
+volumes:
+  mongodb_data:
+```
+
+---
+
+# Deploy Everything
+
+Build and Start:
+
+```bash
+docker compose up -d --build
+```
+
+Check:
+
+```bash
+docker ps
+```
+
+Expected Containers:
+
+```text
+frontend
+node-api
+python-api
+mongodb
+traefik
+portainer
+```
+
+---
+
+# Access URLs
+
+```text
+https://app.example.com
+
+https://node.example.com
+
+https://python.example.com
+
+https://portainer.example.com
+```
+
+All traffic is routed through Traefik and secured with Let's Encrypt SSL certificates.
